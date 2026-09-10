@@ -33,7 +33,7 @@ From **tenant onboarding** to **monthly billing**, **payment tracking**, **arrea
 
 ```bash
 # 1. Clone the repository
-git clone <this-repo-url>
+git clone https://github.com/amaanyousaf123-ops/rental-tracking-app.git
 cd rental-tracking-app
 
 # 2. (Optional) Create & activate a virtual environment
