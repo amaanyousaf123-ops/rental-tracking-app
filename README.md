@@ -87,7 +87,14 @@ rental-tracking-app/
 
 ## 📸 Screenshots
 
-*(Add your own screenshots here to showcase the dashboard, billing screen, and printed bill slip — they make great portfolio material!)*
+| | |
+|---|---|
+| **Dashboard** — at-a-glance collections, dues & monthly stats | **Tenants** — active lease management with dues per shop |
+| ![Dashboard](screenshots/dashboard.png) | ![Tenants](screenshots/tenants.png) |
+| **Billing** — monthly cycle generation with due-day & surcharge settings | **Billing Details** — per-tenant bill breakdown (balance, rent, payments, LP fee) |
+| ![Billing](screenshots/billing.png) | ![Billing Details](screenshots/billing_details.png) |
+| **Printed Bill Slip** — Customer/Office/Bank copies with monthly tracker | **Log Payment** — quick-pay with live outstanding-dues display |
+| ![Printed Bill Slip](screenshots/print_bills.png) | ![Log Payment](screenshots/log_payment.png) |
 
 ## 📄 License
 
