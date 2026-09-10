@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Rental Tracker Billing{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Dashboard Overview</h1>
+    <div class="btn-actions">
+        <a href="{{ url_for('export_shops_matrix') }}" class="btn btn-success">
+            Export Shops Ledger (Excel)
+        </a>
+        <a href="{{ url_for('export_excel') }}" class="btn btn-secondary">
+            Export Backup (Excel)
+        </a>
+        <a href="{{ url_for('payment') }}" class="btn btn-primary">
+            Log New Payment
+        </a>
+    </div>
+</div>
+
+<!-- Core Metrics Grid -->
+<div class="dashboard-grid">
+    <div class="metric-card">
+        <div>
+            <div class="metric-label">Total Outstanding Dues</div>
+            <div class="metric-value dues">PKR {{ format_currency(total_dues_outstanding) }}</div>
+        </div>
+        <div class="metric-desc">Running sum of all tenant balances</div>
+    </div>
+
+    <div class="metric-card">
+        <div>
+            <div class="metric-label">Collected This Month</div>
+            <div class="metric-value collected">PKR {{ format_currency(total_collected_this_month) }}</div>
+        </div>
+        <div class="metric-desc">Total payments in {{ current_month_str }}</div>
+    </div>
+
+    <div class="metric-card">
+        <div>
+            <div class="metric-label">Active Tenants</div>
+            <div class="metric-value">{{ active_tenants_count }}</div>
+        </div>
+        <div class="metric-desc">Leases currently active in system</div>
+    </div>
+
+    <div class="metric-card">
+        <div>
+            <div class="metric-label">Vacant Shops</div>
+            <div class="metric-value" style="color: #60a5fa;">{{ vacant_shops_count }}</div>
+        </div>
+        <div class="metric-desc">Standardized shops without active lease</div>
+    </div>
+
+    <div class="metric-card">
+        <div>
+            <div class="metric-label">Active Installment Plans</div>
+            <div class="metric-value" style="color: #a78bfa;">{{ active_plans_count }}</div>
+        </div>
+        <div class="metric-desc"><a href="{{ url_for('installments_list') }}" style="color: var(--text-secondary); text-decoration: underline;">View Plans</a></div>
+    </div>
+
+    <div class="metric-card">
+        <div>
+            <div class="metric-label">Collection Efficiency</div>
+            <div class="metric-value" style="color: #fbbf24;">{{ collection_efficiency|round(1) }}%</div>
+        </div>
+        <div class="metric-desc">Of rent charged this month</div>
+    </div>
+</div>
+
+<!-- Financial Charts Grid -->
+<div class="grid-2col" style="margin-bottom: 2rem;">
+    <!-- Dues by Block Doughnut -->
+    <div class="card" style="margin-bottom: 0;">
+        <h2 class="card-title">Outstanding Dues by Block</h2>
+        <div style="position: relative; height: 280px; display: flex; justify-content: center; align-items: center;">
+            <canvas id="duesBlockChart"></canvas>
+        </div>
+    </div>
+    
+    <!-- Collections vs Charges Bar Chart -->
+    <div class="card" style="margin-bottom: 0;">
+        <h2 class="card-title">Billing vs Collections Trends</h2>
+        <div style="position: relative; height: 280px;">
+            <canvas id="trendsChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Embedded JSON Data for Chart.js -->
+<script id="chart-data" type="application/json">
+{
+    "block_names": {{ block_names|tojson }},
+    "block_dues": {{ block_dues_list|tojson }},
+    "months": {{ trends_months|tojson }},
+    "rent_charged": {{ trends_rent|tojson }},
+    "payments_collected": {{ trends_collected|tojson }}
+}
+</script>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+    <!-- Block-Wise Dues Breakdown -->
+    <div class="card" style="margin-bottom: 0;">
+        <h2 class="card-title">Block-Wise Outstanding Dues</h2>
+        
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Block</th>
+                        <th style="text-align: right;">Outstanding Dues</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for block, dues in block_dues.items() %}
+                    <tr>
+                        <td><strong>{{ block }}</strong></td>
+                        <td style="text-align: right; color: {% if dues > 0 %}#f87171{% else %}var(--text-primary){% endif %}; font-weight: 600;">
+                            PKR {{ format_currency(dues) }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" style="text-align: center;">No dues recorded.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="block-progress-container">
+            <h3 style="font-size: 0.95rem; font-weight: 600; margin: 1.5rem 0 0.75rem 0; color: #fff;">Dues Distribution Visualizer</h3>
+            {% set total = [total_dues_outstanding] %}
+            {% for block, dues in block_dues.items() %}
+                {% if total[0] > 0 and dues > 0 %}
+                    {% set pct = (dues / total[0]) * 100 %}
+                    <div class="block-progress-row">
+                        <div class="block-progress-meta">
+                            <span>{{ block }}</span>
+                            <span>{{ pct|round(1) }}%</span>
+                        </div>
+                        <div class="block-progress-bar-outer">
+                            <div class="block-progress-bar-inner" style="width: {{ pct }}%;"></div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Dues Aging Analysis Card -->
+    <div class="card" style="margin-bottom: 0;">
+        <h2 class="card-title">Dues Aging Analysis</h2>
+        
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aging Bracket</th>
+                        <th style="text-align: right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>0 - 30 Days</strong> (Current)</td>
+                        <td style="text-align: right; color: var(--text-primary); font-weight: 600;">
+                            PKR {{ format_currency(aging_buckets.age_0_30) }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>31 - 60 Days</strong> (Overdue)</td>
+                        <td style="text-align: right; color: #fbbf24; font-weight: 600;">
+                            PKR {{ format_currency(aging_buckets.age_31_60) }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>60+ Days</strong> (Critical)</td>
+                        <td style="text-align: right; color: #ef4444; font-weight: 600;">
+                            PKR {{ format_currency(aging_buckets.age_60_plus) }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="block-progress-container" style="margin-top: 1.5rem;">
+            <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: #fff;">Aging Distribution Visualizer</h3>
+            {% set total = total_dues_outstanding %}
+            {% if total > 0 %}
+                <!-- 0-30 Days Progress -->
+                {% set pct_0_30 = (aging_buckets.age_0_30 / total) * 100 %}
+                <div class="block-progress-row" style="margin-bottom: 1rem;">
+                    <div class="block-progress-meta">
+                        <span>0 - 30 Days</span>
+                        <span>{{ pct_0_30|round(1) }}%</span>
+                    </div>
+                    <div class="block-progress-bar-outer">
+                        <div class="block-progress-bar-inner" style="width: {{ pct_0_30 }}%; background: var(--primary);"></div>
+                    </div>
+                </div>
+
+                <!-- 31-60 Days Progress -->
+                {% set pct_31_60 = (aging_buckets.age_31_60 / total) * 100 %}
+                <div class="block-progress-row" style="margin-bottom: 1rem;">
+                    <div class="block-progress-meta">
+                        <span>31 - 60 Days</span>
+                        <span>{{ pct_31_60|round(1) }}%</span>
+                    </div>
+                    <div class="block-progress-bar-outer">
+                        <div class="block-progress-bar-inner" style="width: {{ pct_31_60 }}%; background: var(--warning);"></div>
+                    </div>
+                </div>
+
+                <!-- 60+ Days Progress -->
+                {% set pct_60_plus = (aging_buckets.age_60_plus / total) * 100 %}
+                <div class="block-progress-row">
+                    <div class="block-progress-meta">
+                        <span>60+ Days</span>
+                        <span>{{ pct_60_plus|round(1) }}%</span>
+                    </div>
+                    <div class="block-progress-bar-outer">
+                        <div class="block-progress-bar-inner" style="width: {{ pct_60_plus }}%; background: var(--danger);"></div>
+                    </div>
+                </div>
+            {% else %}
+                <div style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; margin-top: 1rem;">No outstanding dues to visualize.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Payments Log -->
+    <div class="card" style="margin-bottom: 0;">
+        <h2 class="card-title">Recent Payments Logged</h2>
+        
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tenant</th>
+                        <th>Shop & Block</th>
+                        <th style="text-align: right;">Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in recent_payments %}
+                    <tr>
+                        <td>
+                            {% if tx.lease %}
+                            <a href="{{ url_for('tenant_statement', lease_id=tx.lease.id) }}" style="color: #fff; text-decoration: none; font-weight: 700; border-bottom: 1px dotted var(--primary);">
+                                {{ tx.lease.tenant_name }}
+                            </a>
+                            {% else %}
+                            <strong>Unknown</strong>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tx.lease %}
+                                {{ tx.lease.formatted_shops }} ({{ tx.lease.formatted_blocks }})
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; color: #34d399; font-weight: 600;">
+                            PKR {{ format_currency(tx.amount|abs) }}
+                        </td>
+                        <td>{{ tx.date }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 2rem 1rem;">No payments logged yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 1rem; text-align: right;">
+            <a href="{{ url_for('audit_logs') }}" style="font-size: 0.85rem; color: var(--primary); text-decoration: none; font-weight: 500;">
+                View All Transaction Audits &rarr;
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

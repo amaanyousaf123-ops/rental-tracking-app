@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Installment Plans — Rental Tracker Billing{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Installment Plans</h1>
+    <a href="{{ url_for('installment_create') }}" class="btn btn-primary">+ Create New Plan</a>
+</div>
+
+{% if plans %}
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Tenant</th>
+                <th>Shop(s)</th>
+                <th>Total Amount</th>
+                <th>Per Installment</th>
+                <th>Progress</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for plan in plans %}
+            <tr>
+                <td>{{ plan.id }}</td>
+                <td>
+                    <a href="{{ url_for('tenant_statement', lease_id=plan.lease.id) }}" class="tenant-link">
+                        {{ plan.lease.tenant_name }}
+                    </a>
+                </td>
+                <td>{{ plan.lease.formatted_blocks }} — {{ plan.lease.formatted_shops }}</td>
+                <td class="text-danger">PKR {{ format_currency(plan.total_amount) }}</td>
+                <td>PKR {{ format_currency(plan.installment_amount) }}</td>
+                <td>
+                    <div class="progress-bar-container" title="{{ plan.paid_count }}/{{ plan.num_installments }} paid">
+                        <div class="progress-bar-fill" style="width: {{ plan.progress_pct }}%"></div>
+                        <span class="progress-bar-label">{{ plan.paid_count }}/{{ plan.num_installments }}</span>
+                    </div>
+                </td>
+                <td>
+                    {% if plan.status == 'Active' %}
+                        <span class="badge badge-active">Active</span>
+                    {% elif plan.status == 'Completed' %}
+                        <span class="badge badge-success">Completed</span>
+                    {% else %}
+                        <span class="badge badge-inactive">Cancelled</span>
+                    {% endif %}
+                </td>
+                <td>{{ plan.created_at.strftime('%d %b %Y') }}</td>
+                <td>
+                    <a href="{{ url_for('installment_detail', plan_id=plan.id) }}" class="btn btn-sm">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="text-align: center; padding: 3rem;">
+    <p style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 1.5rem;">No installment plans have been created yet.</p>
+    <a href="{{ url_for('installment_create') }}" class="btn btn-primary">Create Your First Plan</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+
+{% block title %}Billing Details - {{ cycle.billing_month }}{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div>
+        <a href="{{ url_for('billing') }}" class="btn btn-secondary" style="margin-bottom: 0.5rem;">
+            &larr; Back to Cycles
+        </a>
+        <h1 class="section-title">
+            Billing Report: 
+            {% set dt = datetime.strptime(cycle.billing_month, "%Y-%m") %}
+            {{ dt.strftime("%B %Y") }}
+        </h1>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            Generated on <strong>{{ cycle.generated_at.strftime("%Y-%m-%d %H:%M:%S") }}</strong> by <strong>{{ cycle.generated_by }}</strong>
+        </p>
+    </div>
+    <div class="btn-actions">
+        <a href="{{ url_for('export_monthly_summary', month=cycle.billing_month) }}" class="btn btn-primary">
+            Export Report (Excel)
+        </a>
+        <a href="{{ url_for('print_bills', month=cycle.billing_month) }}" target="_blank" class="btn btn-success">
+            Print All Bills (3 Copies)
+        </a>
+        {% if not cycle.is_locked %}
+        <form action="{{ url_for('generate_billing') }}" method="POST" style="display: inline;" onsubmit="return confirm('Regenerate bills for {{ cycle.billing_month }} with updated tenant rents, waiver settings, and balances?')">
+            <input type="hidden" name="billing_month" value="{{ cycle.billing_month }}">
+            <input type="hidden" name="due_day" value="{{ cycle.due_day }}">
+            <input type="hidden" name="lp_surcharge" value="{{ cycle.lp_surcharge }}">
+            <input type="hidden" name="operator_name" value="{{ cycle.generated_by }}">
+            <button type="submit" class="btn btn-warning" style="color: #000; font-weight: 600;">
+                🔄 Regenerate Bills
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Cycle Settings & Lock Status Card -->
+<div class="grid-2col" style="grid-template-columns: 1fr 1fr; margin-bottom: 1.5rem;">
+    <!-- Cycle Info Card -->
+    <div class="card" style="margin-bottom: 0;">
+        <h2 class="card-title" style="font-size: 1rem;">Billing Cycle Settings</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; margin-bottom: 0.5rem;">
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Due Date</div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #fff; margin-top: 0.15rem;">{{ cycle.due_day }}<sup style="font-size: 0.7rem; color: var(--text-secondary);">th</sup></div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">of each month</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">LP Surcharge</div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #f59e0b; margin-top: 0.15rem;">PKR {{ format_currency(cycle.lp_surcharge) }}</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">late payment fee</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Lock Status</div>
+                <div style="margin-top: 0.15rem;">
+                    {% if cycle.is_locked %}
+                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 0.3rem 0.75rem; border-radius: 8px; font-size: 0.9rem; font-weight: 700;">
+                        🔒 Locked
+                    </span>
+                    {% else %}
+                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(52, 211, 153, 0.15); color: #34d399; padding: 0.3rem 0.75rem; border-radius: 8px; font-size: 0.9rem; font-weight: 700;">
+                        🔓 Open
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Settings / Rollback Card -->
+    <div class="card" style="margin-bottom: 0;">
+        {% if not cycle.is_locked %}
+        <!-- Editable Settings Form (only for unlocked cycles) -->
+        <h2 class="card-title" style="font-size: 1rem;">Edit Cycle Settings</h2>
+        <form action="{{ url_for('update_billing_settings', month=cycle.billing_month) }}" method="POST">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="edit_due_day" style="font-size: 0.8rem;">Due Day</label>
+                    <input type="number" id="edit_due_day" name="due_day" class="form-control" value="{{ cycle.due_day }}" min="1" max="28">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="edit_lp_surcharge" style="font-size: 0.8rem;">LP Surcharge (PKR)</label>
+                    <input type="number" step="0.01" id="edit_lp_surcharge" name="lp_surcharge" class="form-control" value="{{ cycle.lp_surcharge }}">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="edit_operator" style="font-size: 0.8rem;">Operator Name</label>
+                    <input type="text" id="edit_operator" name="operator_name" class="form-control" placeholder="Your name" required>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+                <button type="submit" class="btn btn-primary btn-sm">Save Settings</button>
+                <form action="{{ url_for('rollback_billing', month=cycle.billing_month) }}" method="POST" style="display: inline;" onsubmit="return confirmRollback(false)">
+                    <input type="hidden" name="operator_name" value="" class="rollback-operator-field">
+                    <input type="hidden" name="unlock_phrase" value="">
+                    <button type="submit" class="btn btn-danger btn-sm">Rollback Cycle</button>
+                </form>
+            </div>
+        </form>
+        {% else %}
+        <!-- Locked Cycle: Rollback requires passphrase -->
+        <h2 class="card-title" style="font-size: 1rem;">🔒 Locked Cycle Actions</h2>
+        <div style="background-color: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+            <strong style="color: #f87171;">This billing cycle is locked.</strong> Its settings cannot be edited. To rollback, you must provide the unlock passphrase followed by your operator name.
+        </div>
+        <form action="{{ url_for('rollback_billing', month=cycle.billing_month) }}" method="POST" onsubmit="return confirmLockedRollback()">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="rollback_operator" style="font-size: 0.8rem;">Operator Name</label>
+                    <input type="text" id="rollback_operator" name="operator_name" class="form-control" placeholder="Your name" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="unlock_phrase" style="font-size: 0.8rem;">Unlock Phrase + Name</label>
+                    <input type="text" id="unlock_phrase" name="unlock_phrase" class="form-control" placeholder="e.g. {{ unlock_passphrase }} YourName" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-danger btn-sm" style="margin-top: 1rem;">
+                🔓 Unlock & Rollback
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.9rem; color: var(--text-secondary);">Total billing entries: <strong>{{ bill_records|length }}</strong></span>
+        <input type="text" class="form-control table-search" data-target="billing-details-table" placeholder="Filter this report..." style="width: 250px;">
+    </div>
+    
+    <div class="table-responsive">
+        <table id="billing-details-table">
+            <thead>
+                <tr>
+                    <th>Tenant Name</th>
+                    <th>Shop & Block</th>
+                    <th style="text-align: right;">Previous Balance</th>
+                    <th style="text-align: right;">Rent Charged</th>
+                    <th style="text-align: right;">LP Surcharge</th>
+                    <th style="text-align: right;">Payments Received</th>
+                    <th style="text-align: right;">Adjustments</th>
+                    <th style="text-align: right;">Total Payable</th>
+                    <th style="text-align: center; width: 120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in bill_records %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('tenant_statement', lease_id=r.lease.id) }}" style="color: #fff; text-decoration: none; font-weight: 700; border-bottom: 1px dotted var(--primary);">
+                            {{ r.lease.tenant_name }}
+                        </a>
+                    </td>
+                    <td>
+                        <span style="font-family: monospace;">{{ r.lease.formatted_shops }}</span>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ r.lease.formatted_blocks }}</div>
+                    </td>
+                    <td style="text-align: right; color: {% if r.prev_bal > 0 %}#f87171{% elif r.prev_bal < 0 %}#34d399{% endif %};">
+                        PKR {{ format_currency(r.prev_bal) }}
+                    </td>
+                    <td style="text-align: right;">
+                        {% if r.is_waived %}
+                        <span class="badge badge-waived">Waived</span>
+                        {% else %}
+                        PKR {{ format_currency(r.rent) }}
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right; color: {% if r.lp_fee > 0 %}#f59e0b{% endif %}; font-weight: {% if r.lp_fee > 0 %}600{% endif %};">
+                        {% if r.lp_fee > 0 %}
+                        PKR {{ format_currency(r.lp_fee) }}
+                        {% else %}
+                        <span style="opacity: 0.4;">—</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right; color: {% if r.payments > 0 %}#34d399{% endif %}; font-weight: 500;">
+                        PKR {{ format_currency(r.payments) }}
+                    </td>
+                    <td style="text-align: right; color: {% if r.adjustments > 0 %}#f59e0b{% elif r.adjustments < 0 %}#34d399{% endif %};">
+                        PKR {{ format_currency(r.adjustments) }}
+                    </td>
+                    <td style="text-align: right; font-weight: 700; color: {% if r.payable > 0 %}#f87171{% elif r.payable < 0 %}#34d399{% endif %};">
+                        PKR {{ format_currency(r.payable) }}
+                    </td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; gap: 0.25rem; justify-content: center;">
+                            <a href="{{ url_for('override_balance', lease_id=r.lease.id, month=cycle.billing_month) }}" class="btn btn-warning btn-sm" style="color: #000; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.5rem;" title="Edit Arrears">
+                                Edit Arrears
+                            </a>
+                            <a href="{{ url_for('print_single_bill', lease_id=r.lease.id, month=cycle.billing_month) }}" target="_blank" class="btn btn-secondary btn-sm" style="font-weight: 500; font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                                Print Slip
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2rem 1rem;">No bills associated with this cycle.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function confirmRollback(isLocked) {
+        const name = prompt("WARNING: This will delete ALL rent charge and late fee records for this cycle. Type your name to confirm rollback:");
+        if (name && name.trim() !== "") {
+            // Find the rollback form and set operator name
+            const form = event.target.closest('form');
+            form.querySelector('.rollback-operator-field').value = name.trim();
+            return true;
+        } else {
+            alert("Rollback cancelled. Operator name is required.");
+            return false;
+        }
+    }
+
+    function confirmLockedRollback() {
+        const opName = document.getElementById('rollback_operator').value.trim();
+        const phrase = document.getElementById('unlock_phrase').value.trim();
+        if (!opName || !phrase) {
+            alert("Both operator name and unlock phrase are required to rollback a locked cycle.");
+            return false;
+        }
+        return confirm("⚠️ WARNING: This will UNLOCK and ROLLBACK this billing cycle, deleting all rent charges and late fees. Are you sure?");
+    }
+</script>
+{% endblock %}

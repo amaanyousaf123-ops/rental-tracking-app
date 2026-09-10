@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit / Override Arrears - {{ lease.tenant_name }}{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Edit / Override Tenant Arrears</h1>
+    {% if selected_month %}
+    <a href="{{ url_for('billing_details', month=selected_month) }}" class="btn btn-secondary">
+        &larr; Back to Billing Report ({{ selected_month }})
+    </a>
+    {% else %}
+    <a href="{{ url_for('tenants') }}" class="btn btn-secondary">
+        &larr; Back to Tenants
+    </a>
+    {% endif %}
+</div>
+
+<div style="max-width: 600px; margin: 0 auto;">
+    <div class="card">
+        <h2 class="card-title" style="color: #f87171;">Audit Logged Arrears Correction</h2>
+        
+        <form action="{{ url_for('override_balance', lease_id=lease.id, month=selected_month) }}" method="POST">
+            <input type="hidden" name="month" value="{{ selected_month or '' }}">
+            
+            <div style="background-color: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem;">
+                <p style="margin-bottom: 0.5rem; font-size: 0.95rem;">
+                    Tenant: <strong>{{ lease.tenant_name }}</strong>
+                </p>
+                <p style="margin-bottom: 0.5rem; font-size: 0.95rem;">
+                    Shop(s): <strong>{{ lease.formatted_shops }} ({{ lease.formatted_blocks }})</strong>
+                </p>
+                <p style="margin-bottom: 0px; font-size: 0.95rem;">
+                    Current Arrears / Dues Balance: <strong style="color: #f87171;">PKR {{ format_currency(lease.current_balance) }}</strong>
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label for="target_balance">New Target Arrears / Dues Balance (PKR)</label>
+                <input type="number" step="0.01" id="target_balance" name="target_balance" class="form-control" 
+                       value="{{ lease.current_balance }}" placeholder="e.g. 5000 (New Outstanding Dues) or 0 (Clear everything)" required>
+                <span class="form-help">Enter the exact amount of arrears outstanding you wish to set. Use positive numbers for dues, 0 for clear, or negative numbers for credit. The system calculates the delta and logs an audit log transaction.</span>
+            </div>
+
+            {% if cycles %}
+            <div class="form-group">
+                <label for="billing_month">Apply Adjustment to Billing Month</label>
+                <select id="billing_month" name="billing_month" class="form-control">
+                    {% for c in cycles %}
+                    <option value="{{ c.billing_month }}" {% if c.billing_month == selected_month %}selected{% endif %}>
+                        {{ c.billing_month }} {% if loop.first %}(Latest Cycle){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <span class="form-help">Select the billing cycle month where this arrears adjustment should be reflected on bills and reports.</span>
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="reason">Reason for Arrears Edit / Adjustment</label>
+                <textarea id="reason" name="reason" class="form-control" rows="3" 
+                          placeholder="e.g., Arrears manually confirmed by admin via payment slip #124 on [date]" required></textarea>
+                <span class="form-help">Mandatory: This note is entered directly into the transaction ledger and audit logs for accounting checks.</span>
+            </div>
+
+            <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <label for="operator_name">Operator Name</label>
+                <input type="text" id="operator_name" name="operator_name" class="form-control" placeholder="Your Name" required>
+            </div>
+
+            <div class="form-row" style="margin-top: 1.5rem;">
+                {% if selected_month %}
+                <a href="{{ url_for('billing_details', month=selected_month) }}" class="btn btn-secondary">Cancel</a>
+                {% else %}
+                <a href="{{ url_for('tenants') }}" class="btn btn-secondary">Cancel</a>
+                {% endif %}
+                <button type="submit" class="btn btn-danger" style="background-color: #dc2626;">
+                    Confirm & Save Arrears
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

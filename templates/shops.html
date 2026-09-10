@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Shops & Blocks - Rental Tracker Billing{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Standardized Shops & Blocks</h1>
+    <div>
+        <a href="{{ url_for('export_shops_matrix') }}" class="btn btn-success">
+            Export Shops Ledger (Excel)
+        </a>
+    </div>
+</div>
+
+<div class="grid-2col">
+    <!-- Block Management Card -->
+    <div class="card">
+        <h2 class="card-title">Manage Blocks</h2>
+        
+        <!-- Add Block Form -->
+        <form action="{{ url_for('add_block') }}" method="POST" style="margin-bottom: 2rem; background-color: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #fff;">Create Standard Block</h3>
+            <div class="form-group">
+                <label for="block_name">Block Name</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="block_name" name="block_name" class="form-control" placeholder="e.g. Block D" required>
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Block List Table -->
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Block Name</th>
+                        <th style="text-align: right;">Total Shops</th>
+                        <th style="text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for block in blocks %}
+                    <tr>
+                        <td><strong>{{ block.name }}</strong></td>
+                        <td style="text-align: right;">{{ block.shops|length }}</td>
+                        <td style="text-align: center;">
+                            <form action="{{ url_for('delete_block', block_id=block.id) }}" method="POST" class="confirm-delete" data-name="{{ block.name }}" style="display: inline-block;">
+                                <button type="submit" class="btn btn-danger btn-sm" {% if block.shops %}disabled title="Cannot delete block containing shops"{% endif %}>
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center;">No Blocks configured.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Shop Management Card -->
+    <div class="card">
+        <h2 class="card-title">Manage Shop Numbers</h2>
+        
+        <!-- Add Shop Form -->
+        <form action="{{ url_for('add_shop') }}" method="POST" style="margin-bottom: 2rem; background-color: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #fff;">Create Standard Shop Number</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="block_id">Select Block</label>
+                    <select id="block_id" name="block_id" class="form-control" required>
+                        <option value="" selected disabled>-- Select Block --</option>
+                        {% for block in blocks %}
+                        <option value="{{ block.id }}">{{ block.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="shop_number">Shop Number</label>
+                    <input type="text" id="shop_number" name="shop_number" class="form-control" placeholder="e.g. 16" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Add Shop to Block</button>
+        </form>
+
+        <!-- Shop List Table with Search Filter -->
+        <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Total Standardized Shops: <strong>{{ shops|length }}</strong></span>
+            <input type="text" class="form-control table-search" data-target="shops-table" placeholder="Filter shops list..." style="width: 200px; padding: 0.5rem 0.75rem; font-size: 0.85rem;">
+        </div>
+        
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table id="shops-table">
+                <thead>
+                    <tr>
+                        <th>Block</th>
+                        <th>Shop Number</th>
+                        <th>Occupancy Status</th>
+                        <th style="text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for shop in shops %}
+                    <tr>
+                        <td>{{ shop.block.name }}</td>
+                        <td><strong>{{ shop.shop_number }}</strong></td>
+                        <td>
+                            {% if shop.lease and shop.lease.status == 'Active' %}
+                            <span class="badge badge-active" title="Leased to {{ shop.lease.tenant_name }}">Leased</span>
+                            {% else %}
+                            <span class="badge badge-inactive">Vacant</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            <form action="{{ url_for('delete_shop', shop_id=shop.id) }}" method="POST" class="confirm-delete" data-name="Shop {{ shop.shop_number }} ({{ shop.block.name }})" style="display: inline-block;">
+                                <button type="submit" class="btn btn-danger btn-sm" {% if shop.lease and shop.lease.status == 'Active' %}disabled title="Cannot delete occupied shop"{% endif %}>
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 2rem 1rem;">No shops configured. Configure blocks first, then add shops.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

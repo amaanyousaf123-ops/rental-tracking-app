@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block title %}Log Payment - Rental Tracker Billing{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Record Tenant Rent Payment</h1>
+</div>
+
+<div class="grid-2col" style="grid-template-columns: 1fr 2fr; gap: 1.5rem; align-items: start;">
+    <!-- Log Payment Receipt Card -->
+    <div class="card">
+        <h2 class="card-title">Log Payment Receipt</h2>
+        
+        <form action="{{ url_for('payment') }}" method="POST">
+            <div class="form-group">
+                <label for="shop_search">Select Tenant / Shop</label>
+                <input type="text" id="shop_search" class="form-control" placeholder="Type to search by tenant or shop number..." autocomplete="off" style="margin-bottom: 0.5rem;">
+                <select id="lease_id" name="lease_id" class="form-control" required size="6" style="width: 100%;">
+                    <option value="" selected disabled>-- Choose Active Tenant Lease --</option>
+                    {% for lease in leases %}
+                    <option value="{{ lease.id }}" data-balance="{{ lease.current_balance }}" {% if request.args.get('lease_id')|int == lease.id %}selected{% endif %}>
+                        {{ lease.tenant_name }} [Shop {{ lease.formatted_shops }} ({{ lease.formatted_blocks }})]
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Dynamic Dues Display (populated by client-side JS) -->
+            <div id="dues_container" style="display: none; background-color: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1.25rem;">
+                <span style="font-size: 0.85rem; color: var(--text-secondary);">Current Outstanding Dues:</span>
+                <span id="current_dues_display" style="font-weight: 700; font-size: 1.1rem; margin-left: 0.5rem;">PKR 0.00</span>
+            </div>
+
+            <div class="form-group">
+                <label for="amount">Payment Amount Received (PKR)</label>
+                <input type="number" step="0.01" min="0.01" id="amount" name="amount" class="form-control" placeholder="e.g. 12000" required>
+            </div>
+
+            <div class="form-group">
+                <label for="date">Payment Date</label>
+                <input type="date" id="date" name="date" class="form-control" value="{{ today_str }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Payment Description / Reference</label>
+                <input type="text" id="description" name="description" class="form-control" placeholder="e.g. Cash payment / Bank deposit slip #892">
+            </div>
+
+            <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <label for="operator_name">Operator Name</label>
+                <input type="text" id="operator_name" name="operator_name" class="form-control" placeholder="Your name (for audit log)" required>
+            </div>
+
+            <div class="form-row" style="margin-top: 1.5rem;">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-success">
+                    Record Rent Payment
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Recent Payments History Card -->
+    <div class="card">
+        <h2 class="card-title">Recent Payments History</h2>
+        
+        <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.9rem; color: var(--text-secondary);">Showing last 25 payments</span>
+            <input type="text" class="form-control table-search" data-target="recent-payments-table" placeholder="Filter payments..." style="width: 250px;">
+        </div>
+
+        <div class="table-responsive">
+            <table id="recent-payments-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Tenant Name</th>
+                        <th>Shop & Block</th>
+                        <th>Description</th>
+                        <th style="text-align: right;">Amount (PKR)</th>
+                        <th style="text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in recent_payments %}
+                    <tr>
+                        <td style="white-space: nowrap; font-weight: 500;">{{ tx.date }}</td>
+                        <td>
+                            <a href="{{ url_for('tenant_statement', lease_id=tx.lease.id) }}" style="color: #fff; text-decoration: none; font-weight: 700; border-bottom: 1px dotted var(--primary);">
+                                {{ tx.lease.tenant_name }}
+                            </a>
+                        </td>
+                        <td>
+                            <span style="font-family: monospace;">{{ tx.lease.formatted_shops }}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">({{ tx.lease.formatted_blocks }})</span>
+                        </td>
+                        <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {{ tx.description or 'Rent Payment' }}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #34d399;">
+                            PKR {{ format_currency(tx.amount|abs) }}
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="{{ url_for('tenant_statement', lease_id=tx.lease.id) }}" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                                Statement
+                            </a>
+                            <form action="{{ url_for('delete_payment', tx_id=tx.id) }}" method="POST" style="display: inline-block;" onsubmit="return confirmDeletePayment('PKR {{ format_currency(tx.amount|abs) }}', '{{ tx.lease.tenant_name }}', '{{ tx.date }}', this);">
+                                <input type="hidden" name="operator_name" value="">
+                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background-color: var(--danger, #dc2626); border-color: var(--danger, #dc2626);">
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 3rem 1rem;">No payments logged yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDeletePayment(amount, tenant, date, form) {
+        const operator = window.prompt(
+            'Delete this payment?\n\nAmount: ' + amount + '\nTenant: ' + tenant + '\nDate: ' + date +
+            '\n\nEnter your name to confirm deletion:',
+            ''
+        );
+        if (operator === null) {
+            return false;
+        }
+        if (!operator.trim()) {
+            alert('Please enter your name to confirm deletion.');
+            return false;
+        }
+        const hidden = form.querySelector('input[name="operator_name"]');
+        hidden.value = operator.trim();
+        return true;
+    }
+    document.addEventListener("DOMContentLoaded", function() {
+        const leaseSelect = document.getElementById('lease_id');
+        const shopSearch = document.getElementById('shop_search');
+        const duesContainer = document.getElementById('dues_container');
+        const duesDisplay = document.getElementById('current_dues_display');
+        const amountInput = document.getElementById('amount');
+
+        if (shopSearch && leaseSelect) {
+            shopSearch.addEventListener('input', function() {
+                const query = this.value.trim().toLowerCase();
+                let matchCount = 0;
+                let firstMatch = null;
+                Array.from(leaseSelect.options).forEach(function(opt) {
+                    if (opt.value === '') return;
+                    const text = opt.textContent.toLowerCase();
+                    const show = text.indexOf(query) !== -1;
+                    opt.hidden = !show;
+                    if (show) {
+                        matchCount++;
+                        if (!firstMatch) firstMatch = opt;
+                    }
+                });
+                if (query && matchCount === 1 && firstMatch) {
+                    leaseSelect.value = firstMatch.value;
+                    leaseSelect.dispatchEvent(new Event('change'));
+                }
+            });
+        }
+
+        leaseSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const balance = parseFloat(selectedOption.getAttribute('data-balance') || '0');
+            
+            if (balance > 0) {
+                duesDisplay.textContent = 'PKR ' + balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                duesDisplay.style.color = '#f87171'; // Red for outstanding dues
+                duesContainer.style.display = 'block';
+                amountInput.value = balance.toFixed(2);
+            } else if (balance < 0) {
+                duesDisplay.textContent = 'PKR ' + Math.abs(balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' (Advance)';
+                duesDisplay.style.color = '#34d399'; // Green for credit
+                duesContainer.style.display = 'block';
+                amountInput.value = '';
+            } else {
+                duesDisplay.textContent = 'PKR 0.00';
+                duesDisplay.style.color = '#fff';
+                duesContainer.style.display = 'block';
+                amountInput.value = '';
+            }
+        });
+    });
+</script>
+{% endblock %}

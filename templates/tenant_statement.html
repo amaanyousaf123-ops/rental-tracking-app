@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Tenant Statement - {{ lease.tenant_name }}{% endblock %}
+
+{% block content %}
+<div class="no-print" style="margin-bottom: 1.5rem;">
+    <a href="{{ url_for('tenants') }}" style="color: var(--primary); text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem;">
+        &larr; Back to Tenants Management
+    </a>
+</div>
+
+<div class="section-header no-print">
+    <h1 class="section-title">Statement of Account</h1>
+    <div class="btn-actions">
+        <a href="{{ url_for('export_tenant_statement', lease_id=lease.id) }}" class="btn btn-secondary">
+            Export to Excel
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            Print Statement
+        </button>
+    </div>
+</div>
+
+<!-- Print-Only Header -->
+<div class="print-only-header">
+    <div style="text-align: center; border-bottom: 3px double #000; padding-bottom: 0.75rem; margin-bottom: 1.5rem;">
+        <h1 style="font-size: 20pt; font-weight: 800; text-transform: uppercase; margin: 0; letter-spacing: 1px;">Rental Tracker</h1>
+        <h2 style="font-size: 14pt; font-weight: 600; text-transform: uppercase; margin: 0.25rem 0 0 0; color: #444;">Statement of Account</h2>
+        <div style="font-size: 9.5pt; color: #666; margin-top: 0.25rem;">Generated on: {{ current_time.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+    </div>
+</div>
+
+<div class="grid-2col" style="grid-template-columns: 1fr 2fr; gap: 1.5rem;">
+    <!-- Tenant Profile Details Card -->
+    <div class="card" style="height: fit-content;">
+        <h2 class="card-title">Tenant Profile</h2>
+        
+        <div style="margin-bottom: 1.25rem;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Tenant Name</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #fff; margin-top: 0.15rem;">{{ lease.tenant_name }}</div>
+        </div>
+
+        <div style="margin-bottom: 1.25rem; display: flex; gap: 1.5rem;">
+            <div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Shop(s)</div>
+                <div style="font-size: 1rem; font-weight: 600; color: #fff; margin-top: 0.15rem; font-family: monospace;">{{ lease.formatted_shops }}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Block(s)</div>
+                <div style="font-size: 1rem; font-weight: 600; color: #fff; margin-top: 0.15rem;">{{ lease.formatted_blocks }}</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 1.25rem; display: flex; gap: 1.5rem; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Monthly Rent</div>
+                <div style="font-size: 1.1rem; font-weight: 600; color: #fff; margin-top: 0.15rem;">
+                    {% if lease.is_waived %}
+                    <span class="badge badge-waived">Waived Off</span>
+                    {% else %}
+                    PKR {{ format_currency(lease.monthly_rent) }}
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Status</div>
+                <div style="margin-top: 0.25rem;">
+                    {% if lease.status == 'Active' %}
+                    <span class="badge badge-active">Active</span>
+                    {% else %}
+                    <span class="badge badge-inactive">Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Outstanding Balance</div>
+            <div style="font-size: 1.6rem; font-weight: 800; color: {% if lease.current_balance > 0 %}#f87171{% elif lease.current_balance < 0 %}#34d399{% else %}#fff{% endif %};">
+                PKR {{ format_currency(lease.current_balance) }}
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                {% if lease.current_balance > 0 %}
+                Outstanding dues to be paid
+                {% elif lease.current_balance < 0 %}
+                Excess credit/Advance payment
+                {% else %}
+                Account fully cleared
+                {% endif %}
+            </div>
+        </div>
+
+        {% if lease.notes %}
+        <div style="margin-bottom: 1.5rem; background-color: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem;">Remarks / Notes</div>
+            <div style="font-size: 0.85rem; line-height: 1.4; color: var(--text-primary);">{{ lease.notes }}</div>
+        </div>
+        {% endif %}
+
+        <div class="no-print btn-actions" style="flex-direction: column; gap: 0.75rem;">
+            <a href="{{ url_for('payment') }}?lease_id={{ lease.id }}" class="btn btn-success" style="width: 100%;">
+                Log Payment
+            </a>
+            <a href="{{ url_for('override_balance', lease_id=lease.id) }}" class="btn btn-warning" style="color: #000; font-weight: 600; width: 100%;">
+                Edit / Override Arrears
+            </a>
+        </div>
+    </div>
+
+    <!-- Account Ledger Card -->
+    <div class="card">
+        <h2 class="card-title">Transaction Ledger & History</h2>
+        
+        <div class="table-responsive">
+            <table style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="text-align: center; width: 60px;">ID</th>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th style="text-align: right;">Amount (PKR)</th>
+                        <th style="text-align: right;">Running Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in ledger %}
+                    <tr>
+                        <td style="text-align: center; font-family: monospace;">{{ row.tx.id }}</td>
+                        <td>{{ row.tx.date }}</td>
+                        <td>
+                            {% if row.tx.type == 'RENT' %}
+                            <span class="badge badge-rent">Rent</span>
+                            {% elif row.tx.type == 'PAYMENT' %}
+                            <span class="badge badge-payment">Payment</span>
+                            {% elif row.tx.type == 'LATE_FEE' %}
+                            <span class="badge badge-late-fee">Late Fee</span>
+                            {% else %}
+                            <span class="badge badge-adjustment">Adjustment</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ row.tx.description or '-' }}
+                            {% if row.tx.billing_month %}
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">({{ row.tx.billing_month }})</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: {% if row.tx.amount > 0 %}#f87171{% else %}#34d399{% endif %};">
+                            {% if row.tx.amount > 0 %}+{% endif %}{{ format_currency(row.tx.amount) }}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: {% if row.running_balance > 0 %}#f87171{% elif row.running_balance < 0 %}#34d399{% else %}var(--text-primary){% endif %};">
+                            PKR {{ format_currency(row.running_balance) }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 3rem 1rem;">No transactions logged for this tenant.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Print media overrides */
+    .print-only-header {
+        display: none;
+    }
+    @media print {
+        header, footer, .no-print, .btn-actions, .badge {
+            display: none !important;
+        }
+        body {
+            background: #fff !important;
+            color: #000 !important;
+            font-family: "Segoe UI", Arial, sans-serif !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .main-content {
+            padding: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+        .print-only-header {
+            display: block !important;
+        }
+        .grid-2col {
+            display: block !important;
+        }
+        .card {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin-bottom: 2rem !important;
+        }
+        .card-title {
+            color: #000 !important;
+            border-bottom: 2px solid #000 !important;
+            font-size: 12pt !important;
+            padding-bottom: 4px !important;
+            margin-bottom: 0.75rem !important;
+        }
+        table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+        }
+        th, td {
+            border: 1px solid #000 !important;
+            padding: 6px 8px !important;
+            color: #000 !important;
+            font-size: 9.5pt !important;
+        }
+        th {
+            background-color: #f2f2f2 !important;
+        }
+        tr:hover td {
+            background-color: transparent !important;
+        }
+        /* Style text color black for values */
+        div, span, td, strong {
+            color: #000 !important;
+        }
+    }
+</style>
+{% endblock %}

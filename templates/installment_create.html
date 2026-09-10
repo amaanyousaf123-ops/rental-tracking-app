@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Create Installment Plan — Rental Tracker Billing{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Create Installment Plan</h1>
+    <a href="{{ url_for('installments_list') }}" class="btn btn-secondary">← Back to Plans</a>
+</div>
+
+<div class="card" style="max-width: 700px;">
+    <form method="POST" action="{{ url_for('installment_create') }}">
+        <div class="form-group">
+            <label for="lease_id">Select Tenant</label>
+            <select name="lease_id" id="installment_lease_id" class="form-control" required>
+                <option value="">-- Select a Tenant --</option>
+                {% for lease in leases %}
+                <option value="{{ lease.id }}" data-balance="{{ lease.current_balance }}">
+                    {{ lease.tenant_name }} — {{ lease.formatted_blocks }} {{ lease.formatted_shops }}
+                    (Balance: PKR {{ format_currency(lease.current_balance) }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="total_amount">Total Amount to Split (PKR)</label>
+            <input type="number" name="total_amount" id="installment_total" class="form-control"
+                   step="0.01" min="1" placeholder="e.g. 60000" required>
+            <small style="color: var(--text-secondary);">The outstanding balance will auto-fill when you select a tenant.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="num_installments">Number of Installments</label>
+            <input type="number" name="num_installments" id="installment_count" class="form-control"
+                   min="2" max="60" placeholder="e.g. 6" required>
+        </div>
+
+        <div class="form-group">
+            <label>Per Installment Amount</label>
+            <div id="per_installment_display" class="form-control" style="background: var(--bg-tertiary); color: var(--primary); font-weight: 600; cursor: default;">
+                —
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="start_date">First Installment Due Date</label>
+            <input type="date" name="start_date" id="installment_start" class="form-control" value="{{ today_str }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Notes (Optional)</label>
+            <textarea name="notes" class="form-control" rows="3" placeholder="Any special agreement details..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="operator_name">Operator Name</label>
+            <input type="text" name="operator_name" class="form-control" placeholder="Your name" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Create Installment Plan</button>
+    </form>
+</div>
+
+<script>
+(function() {
+    const leaseSelect = document.getElementById('installment_lease_id');
+    const totalInput = document.getElementById('installment_total');
+    const countInput = document.getElementById('installment_count');
+    const perDisplay = document.getElementById('per_installment_display');
+
+    // Auto-fill balance when tenant is selected
+    leaseSelect.addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        const bal = parseFloat(opt.dataset.balance || 0);
+        if (bal > 0) {
+            totalInput.value = bal.toFixed(2);
+            updatePerInstallment();
+        }
+    });
+
+    // Auto-calculate per installment
+    function updatePerInstallment() {
+        const total = parseFloat(totalInput.value) || 0;
+        const count = parseInt(countInput.value) || 0;
+        if (total > 0 && count >= 2) {
+            const per = total / count;
+            perDisplay.textContent = 'PKR ' + per.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        } else {
+            perDisplay.textContent = '—';
+        }
+    }
+
+    totalInput.addEventListener('input', updatePerInstallment);
+    countInput.addEventListener('input', updatePerInstallment);
+})();
+</script>
+{% endblock %}

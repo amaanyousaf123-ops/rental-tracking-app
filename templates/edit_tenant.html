@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Lease - {{ lease.tenant_name }}{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Modify Tenant Lease</h1>
+    <a href="{{ url_for('tenants') }}" class="btn btn-secondary">
+        &larr; Back to Tenants
+    </a>
+</div>
+
+<div style="max-width: 600px; margin: 0 auto;">
+    <div class="card">
+        <h2 class="card-title">Edit Lease details for: {{ lease.tenant_name }}</h2>
+        
+        <form action="{{ url_for('edit_tenant', lease_id=lease.id) }}" method="POST">
+            <div class="form-group">
+                <label for="tenant_name">Tenant Name</label>
+                <input type="text" id="tenant_name" name="tenant_name" class="form-control" value="{{ lease.tenant_name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="status">Lease Status</label>
+                <select id="status" name="status" class="form-control" required onchange="toggleInactiveDate()">
+                    <option value="Active" {% if lease.status == 'Active' %}selected{% endif %}>Active</option>
+                    <option value="Inactive" {% if lease.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+                <span class="form-help">Warning: Setting status to Inactive will release all occupied shops, making them vacant.</span>
+            </div>
+
+            <div class="form-group" id="inactive_date_group" style="display: none;">
+                <label for="inactive_date">Inactive Date (Billing Cutoff)</label>
+                <input type="date" id="inactive_date" name="inactive_date" class="form-control" value="{{ lease.inactive_date or '' }}">
+                <span class="form-help" style="color: var(--text-secondary);">
+                    The date this shop became inactive. Rent will not be billed for any month that starts on or after this date
+                    (e.g. if the shop was inactive before Sep 1, September's bill will not be generated).
+                    If left blank, today's date will be used.
+                </span>
+            </div>
+
+            <div class="form-group">
+                <label for="shop_ids">Assigned Shop(s)</label>
+                <select id="shop_ids" name="shop_ids" class="form-control select-multiple" multiple required>
+                    {% for shop in available_shops %}
+                    <option value="{{ shop.id }}" {% if shop in lease.shops %}selected{% endif %}>
+                        {{ shop.block.name }} - Shop {{ shop.shop_number }}
+                    </option>
+                    {% else %}
+                    <option disabled>No shops available</option>
+                    {% endfor %}
+                </select>
+                <span class="form-help">Hold Ctrl (Windows) / Cmd (Mac) to select multiple shops. Selected shops will be grouped on a single bill line.</span>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="is_waived" name="is_waived" {% if lease.is_waived %}checked{% endif %} onchange="toggleWaiverFields()">
+                <label for="is_waived">Waive Rent for this Tenant (full waiver)</label>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="monthly_rent">Monthly Rent (PKR)</label>
+                <input type="number" step="0.01" min="0" id="monthly_rent" name="monthly_rent" class="form-control" 
+                       value="{% if lease.monthly_rent is not none %}{{ lease.monthly_rent }}{% endif %}" placeholder="e.g. 12000">
+            </div>
+
+            <div class="form-group" id="waived_amount_group">
+                <label for="waived_amount">Partial Waiver Amount (PKR)</label>
+                <input type="number" step="0.01" min="0" id="waived_amount" name="waived_amount" class="form-control"
+                       value="{% if lease.waived_amount is not none %}{{ lease.waived_amount }}{% endif %}" placeholder="e.g. 5000">
+                <span class="form-help" style="color: var(--text-secondary);">
+                    Optional: a fixed amount to waive from each month's bill. The billed rent will be
+                    Monthly Rent minus this waiver amount (e.g. 12000 rent with 5000 waiver = 8000 billed).
+                    Leave blank for no partial waiver.
+                </span>
+            </div>
+
+            <div class="form-group" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                <label for="current_balance" style="font-weight: 700; color: #f59e0b;">Arrears / Outstanding Dues Balance (PKR)</label>
+                <input type="number" step="0.01" id="current_balance" name="current_balance" class="form-control" 
+                       value="{{ lease.current_balance }}" placeholder="e.g. 15000 (Dues) or -5000 (Credit)">
+                <span class="form-help" style="color: var(--text-secondary);">
+                    Current outstanding arrears for this tenant. Positive for unpaid dues, 0 for cleared, or negative for advance credit.
+                    Changing this value will record a balance adjustment in the ledger. 
+                    <a href="{{ url_for('override_balance', lease_id=lease.id) }}" style="color: var(--primary); font-weight: 600;">Need to add a detailed reason? Click here for Manual Override.</a>
+                </span>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes / Remarks</label>
+                <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Contract terms...">{{ lease.notes or '' }}</textarea>
+            </div>
+
+            <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <label for="operator_name">Operator Name</label>
+                <input type="text" id="operator_name" name="operator_name" class="form-control" placeholder="Your name (for audit trail)" required>
+                <span class="form-help">Mandatory: Edits are logged to the transaction history audit database.</span>
+            </div>
+
+            <div class="form-row" style="margin-top: 1.5rem;">
+                <a href="{{ url_for('tenants') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleInactiveDate() {
+        const statusSelect = document.getElementById('status');
+        const inactiveGroup = document.getElementById('inactive_date_group');
+        if (statusSelect && inactiveGroup) {
+            inactiveGroup.style.display = (statusSelect.value === 'Inactive') ? 'block' : 'none';
+        }
+    }
+
+    function toggleWaiverFields() {
+        const isWaived = document.getElementById('is_waived').checked;
+        const waivedAmountGroup = document.getElementById('waived_amount_group');
+        const waivedAmountInput = document.getElementById('waived_amount');
+        if (isWaived) {
+            waivedAmountInput.value = '';
+            waivedAmountInput.disabled = true;
+            waivedAmountGroup.style.opacity = '0.5';
+        } else {
+            waivedAmountInput.disabled = false;
+            waivedAmountGroup.style.opacity = '1';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleInactiveDate();
+        toggleWaiverFields();
+    });
+</script>
+{% endblock %}

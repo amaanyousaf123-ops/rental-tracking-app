@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Flask / SQLite instance data
+instance/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs & runtime
+server_log.txt
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

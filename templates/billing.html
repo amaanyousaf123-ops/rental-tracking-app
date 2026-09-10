@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Monthly Billing Cycles - Rental Tracker Billing{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Rent Billing Cycles</h1>
+</div>
+
+<div class="grid-2col" style="grid-template-columns: 1fr 2fr;">
+    <!-- Generate Billing Form Card -->
+    <div class="card">
+        <h2 class="card-title">Run Billing Cycle</h2>
+        
+        <form action="{{ url_for('generate_billing') }}" method="POST">
+            <div style="background-color: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                <strong>Billing Cycle Rules:</strong>
+                <ul style="margin-left: 1.25rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                    <li>Charges rent for all <strong>Active</strong> leases.</li>
+                    <li>Shops with waived rent will accrue <strong>PKR 0.00</strong> charges automatically.</li>
+                    <li>Prevents double-charging (cannot run the same month twice).</li>
+                    <li><strong>Auto-LP:</strong> Tenants who didn't pay last month by its due date will be charged the LP surcharge.</li>
+                    <li>Previous billing cycle will be <strong>locked</strong> automatically.</li>
+                </ul>
+            </div>
+
+            <div class="form-group">
+                <label for="billing_month">Target Billing Month</label>
+                <input type="month" id="billing_month" name="billing_month" class="form-control" value="{{ current_month }}" required>
+                <span class="form-help">Choose the year and month to generate bills (e.g. August 2026).</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label for="due_day">Due Date (Day of Month)</label>
+                    <input type="number" id="due_day" name="due_day" class="form-control" value="15" min="1" max="28" required>
+                    <span class="form-help">Day when rent is due (1–28).</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="lp_surcharge">LP Surcharge (PKR)</label>
+                    <input type="number" step="0.01" id="lp_surcharge" name="lp_surcharge" class="form-control" value="1000" min="0" required>
+                    <span class="form-help">Late payment surcharge amount.</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="operator_name">Operator Name</label>
+                <input type="text" id="operator_name" name="operator_name" class="form-control" placeholder="Your Name" required>
+                <span class="form-help">Required for the audit paper trail.</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                Generate Monthly Bills
+            </button>
+        </form>
+    </div>
+
+    <!-- Billing Cycles List Card -->
+    <div class="card">
+        <h2 class="card-title">Billing History & Reports</h2>
+        
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Billing Month</th>
+                        <th style="text-align: center;">Due Day</th>
+                        <th style="text-align: right;">LP Surcharge</th>
+                        <th>Run Timestamp</th>
+                        <th>Executed By</th>
+                        <th style="text-align: center;">Status</th>
+                        <th style="text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cycle in cycles %}
+                    <tr>
+                        <td>
+                            <strong>
+                                {% set dt = datetime.strptime(cycle.billing_month, "%Y-%m") %}
+                                {{ dt.strftime("%B %Y") }}
+                            </strong>
+                            <code style="font-size: 0.8rem; margin-left: 0.5rem; opacity: 0.7;">({{ cycle.billing_month }})</code>
+                        </td>
+                        <td style="text-align: center; font-weight: 600;">{{ cycle.due_day }}</td>
+                        <td style="text-align: right; font-weight: 600;">PKR {{ format_currency(cycle.lp_surcharge) }}</td>
+                        <td>{{ cycle.generated_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                        <td>{{ cycle.generated_by }}</td>
+                        <td style="text-align: center;">
+                            {% if cycle.is_locked %}
+                            <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">
+                                🔒 Locked
+                            </span>
+                            {% else %}
+                            <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(52, 211, 153, 0.15); color: #34d399; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">
+                                🔓 Open
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            <div class="btn-actions" style="justify-content: center;">
+                                <a href="{{ url_for('billing_details', month=cycle.billing_month) }}" class="btn btn-secondary btn-sm">
+                                    View Report
+                                </a>
+                                <a href="{{ url_for('export_monthly_summary', month=cycle.billing_month) }}" class="btn btn-success btn-sm">
+                                    Excel Summary
+                                </a>
+                                <a href="{{ url_for('print_bills', month=cycle.billing_month) }}" target="_blank" class="btn btn-primary btn-sm">
+                                    Print Slips
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 3rem 1rem;">
+                            No billing cycles have been run yet. Use the form on the left to run your first cycle!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}Audit Trail - Rental Tracker Billing{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Audit Trail & Activity Log</h1>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <input type="text" class="form-control table-search" data-target="audit-table" placeholder="Search audit trail..." style="width: 250px;">
+        <a href="{{ url_for('export_excel') }}" class="btn btn-secondary">
+            Export Audit to Excel
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <h2 class="card-title">System Activity Log (Paper Trail)</h2>
+    
+    <div class="table-responsive">
+        <table id="audit-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Action Type</th>
+                    <th>Associated Tenant</th>
+                    <th>Description of Activity</th>
+                    <th>Performed By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td style="white-space: nowrap; font-size: 0.85rem; font-family: monospace;">
+                        {{ log.created_at.strftime("%Y-%m-%d %H:%M:%S") }}
+                    </td>
+                    <td>
+                        {% if log.action in ['MANUAL_OVERRIDE', 'MANUAL_ADJUSTMENT'] %}
+                        <span class="badge badge-adjustment" style="background-color: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+                            Override
+                        </span>
+                        {% elif log.action == 'CREATE_LEASE' %}
+                        <span class="badge badge-active">New Lease</span>
+                        {% elif log.action in ['DEACTIVATE_LEASE', 'DELETE_LEASE'] %}
+                        <span class="badge badge-inactive">Release</span>
+                        {% elif log.action in ['CHARGE_RENT', 'BILLING_RENT_CHARGE'] %}
+                        <span class="badge badge-rent">Rent Run</span>
+                        {% elif log.action in ['LOG_PAYMENT', 'RECEIVE_PAYMENT'] %}
+                        <span class="badge badge-payment">Payment</span>
+                        {% else %}
+                        <span class="badge badge-secondary" style="background-color: rgba(255, 255, 255, 0.08); color: var(--text-primary); border: 1px solid var(--border-color);">
+                            {{ log.action }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.lease %}
+                        <strong>{{ log.lease.tenant_name }}</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Shop {{ log.lease.formatted_shops }}</div>
+                        {% else %}
+                        <span style="color: var(--text-secondary); font-style: italic;">System-wide</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 0.9rem; line-height: 1.4; color: var(--text-primary);">
+                        {{ log.description }}
+                    </td>
+                    <td>
+                        <strong style="color: #60a5fa;">{{ log.performed_by }}</strong>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 2rem 1rem;">No activities logged in the database yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block title %}Tenant Leases - Rental Tracker Billing{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Tenant Lease Management</h1>
+    <div>
+        <input type="text" class="form-control table-search" data-target="active-tenants-table" placeholder="Search active tenants..." style="width: 250px; display: inline-block;">
+    </div>
+</div>
+
+<div class="grid-2col" style="grid-template-columns: 2fr 1fr;">
+    <!-- Active Tenants List -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2 class="card-title">Active Tenant Leases</h2>
+        
+        <div class="table-responsive">
+            <table id="active-tenants-table">
+                <thead>
+                    <tr>
+                        <th>Tenant Name</th>
+                        <th>Shop(s)</th>
+                        <th>Block(s)</th>
+                        <th style="text-align: right;">Monthly Rent</th>
+                        <th style="text-align: right;">Current Dues</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lease in active_leases %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('tenant_statement', lease_id=lease.id) }}" style="color: #fff; text-decoration: none; font-weight: 700; border-bottom: 1px dotted var(--primary);">
+                                {{ lease.tenant_name }}
+                            </a>
+                            {% if lease.notes %}
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                                <em>Notes: {{ lease.notes }}</em>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span style="font-family: monospace; font-weight: 600;">{{ lease.formatted_shops }}</span>
+                        </td>
+                        <td>{{ lease.formatted_blocks }}</td>
+                        <td style="text-align: right;">
+                            {% if lease.is_waived %}
+                            <span class="badge badge-waived">Waived Off</span>
+                            {% else %}
+                            PKR {{ format_currency(lease.monthly_rent) }}
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: {% if lease.current_balance > 0 %}#f87171{% elif lease.current_balance < 0 %}#34d399{% else %}var(--text-primary){% endif %};">
+                            PKR {{ format_currency(lease.current_balance) }}
+                        </td>
+                        <td>
+                            <div class="btn-actions">
+                                <a href="{{ url_for('edit_tenant', lease_id=lease.id) }}" class="btn btn-secondary btn-sm">
+                                    Edit
+                                </a>
+                                <a href="{{ url_for('override_balance', lease_id=lease.id) }}" class="btn btn-warning btn-sm" style="color: #000; font-weight: 600;">
+                                    Edit Arrears
+                                </a>
+                                <form action="{{ url_for('delete_tenant', lease_id=lease.id) }}" method="POST" class="confirm-delete" data-name="{{ lease.tenant_name }}" style="display: inline-block;">
+                                    <!-- Prompt Operator Name prior to delete -->
+                                    <input type="hidden" name="operator_name" value="Admin Override" id="op_del_{{ lease.id }}">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return promptOperatorForDelete('{{ lease.id }}')">
+                                        Release
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 3rem 1rem;">
+                            No active tenant leases. Create one using the form on the right!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create Lease Sidebar Form -->
+    <div class="card">
+        <h2 class="card-title">New Tenant Registration</h2>
+        
+        <form action="{{ url_for('add_tenant') }}" method="POST">
+            <div class="form-group">
+                <label for="tenant_name">Tenant Name</label>
+                <input type="text" id="tenant_name" name="tenant_name" class="form-control" placeholder="e.g. M. Zubair" required>
+            </div>
+
+            <div class="form-group">
+                <label for="shop_ids">Assign Shop(s)</label>
+                <select id="shop_ids" name="shop_ids" class="form-control select-multiple" multiple required>
+                    {% for shop in vacant_shops %}
+                    <option value="{{ shop.id }}">{{ shop.block.name }} - Shop {{ shop.shop_number }}</option>
+                    {% else %}
+                    <option disabled>No vacant shops available</option>
+                    {% endfor %}
+                </select>
+                <span class="form-help">Hold Ctrl (Windows) / Cmd (Mac) to select multiple shops for a combined lease.</span>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="is_waived" name="is_waived" onchange="toggleWaiverFields()">
+                <label for="is_waived">Waive Rent for this Tenant (full waiver)</label>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="monthly_rent">Monthly Rent (PKR)</label>
+                <input type="number" step="0.01" min="0" id="monthly_rent" name="monthly_rent" class="form-control" placeholder="e.g. 12000" required>
+            </div>
+
+            <div class="form-group" id="waived_amount_group">
+                <label for="waived_amount">Partial Waiver Amount (PKR)</label>
+                <input type="number" step="0.01" min="0" id="waived_amount" name="waived_amount" class="form-control" placeholder="e.g. 5000">
+                <span class="form-help">Optional: a fixed amount to waive from each month's bill. Leave blank for no partial waiver.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="starting_balance">Starting Dues Balance (PKR)</label>
+                <input type="number" step="0.01" id="starting_balance" name="starting_balance" class="form-control" placeholder="e.g. 15000 (Dues) or -5000 (Credit)" value="0">
+                <span class="form-help">Starting outstanding balance if migrating an existing tenant. Use positive for dues, negative for credit.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes / Remarks</label>
+                <textarea id="notes" name="notes" class="form-control" rows="2" placeholder="Lease details, contract terms..."></textarea>
+            </div>
+
+            <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <label for="operator_name">Operator Name</label>
+                <input type="text" id="operator_name" name="operator_name" class="form-control" placeholder="Your name (for audit trail)" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                Register Tenant & Lease
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Inactive Tenants/Historical Records -->
+<div class="card" style="margin-top: 1rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+        <h2 class="card-title" style="margin: 0;">Inactive / Historical Tenancies</h2>
+        <input type="text" class="form-control table-search" data-target="inactive-tenants-table" placeholder="Search inactive tenants..." style="width: 250px; display: inline-block;">
+    </div>
+    <div class="table-responsive">
+        <table id="inactive-tenants-table">
+            <thead>
+                <tr>
+                    <th>Tenant Name</th>
+                    <th style="text-align: right;">Final Balance</th>
+                    <th>Inactive Since</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lease in inactive_leases %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('tenant_statement', lease_id=lease.id) }}" style="color: var(--text-primary); text-decoration: none; font-weight: 600; border-bottom: 1px dotted var(--text-secondary);">
+                            {{ lease.tenant_name }}
+                        </a>
+                    </td>
+                    <td style="text-align: right; font-weight: 600; color: {% if lease.current_balance > 0 %}#f87171{% elif lease.current_balance < 0 %}#34d399{% else %}var(--text-primary){% endif %};">
+                        PKR {{ format_currency(lease.current_balance) }}
+                    </td>
+                    <td style="white-space: nowrap;">{{ lease.inactive_date or '—' }}</td>
+                    <td>{{ lease.notes or 'No notes.' }}</td>
+                    <td><span class="badge badge-inactive">Inactive</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 1.5rem 1rem;">No historical inactive tenants.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function toggleWaiverFields() {
+        const isWaived = document.getElementById('is_waived').checked;
+        const waivedAmountGroup = document.getElementById('waived_amount_group');
+        const waivedAmountInput = document.getElementById('waived_amount');
+        if (isWaived) {
+            waivedAmountInput.value = '';
+            waivedAmountInput.disabled = true;
+            waivedAmountGroup.style.opacity = '0.5';
+        } else {
+            waivedAmountInput.disabled = false;
+            waivedAmountGroup.style.opacity = '1';
+        }
+    }
+    document.addEventListener('DOMContentLoaded', toggleWaiverFields);
+
+    // Prompt the operator for their name to log in the audit trail during deletion
+    function promptOperatorForDelete(leaseId) {
+        const name = prompt("Please enter your name to confirm releasing this tenant lease (required for Audit Trail):");
+        if (name && name.trim() !== "") {
+            document.getElementById('op_del_' + leaseId).value = name.trim();
+            return true;
+        } else {
+            alert("Deactivation cancelled. Operator name is mandatory.");
+            return false;
+        }
+    }
+</script>
+{% endblock %}

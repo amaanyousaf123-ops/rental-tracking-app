@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Rent Bills - {{ cycle.billing_month }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Screen-only floating action banner for print control */
+        .print-control-banner {
+            background-color: #1e293b;
+            color: #f1f5f9;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            border-bottom: 2px solid #3b82f6;
+            font-family: 'Outfit', sans-serif;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .print-control-banner span {
+            font-size: 0.9rem;
+            opacity: 0.85;
+            flex-grow: 1;
+        }
+
+        .print-container {
+            padding: 20px;
+            max-width: 850px;
+            margin: 0 auto;
+        }
+
+        /* Invoice Sheet Style */
+        .bill-page {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            margin-bottom: 2rem;
+            color: #000;
+        }
+
+        /* Split Copies separator */
+        .bill-slip {
+            border-bottom: 2px dashed #000000;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .bill-slip:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        /* Typography & Layout elements */
+        .bill-main-header {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 16pt;
+            font-weight: 800;
+            text-align: center;
+            text-transform: uppercase;
+            color: #000;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+
+        .bill-sub-header {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 11pt;
+            font-weight: 700;
+            text-align: center;
+            text-transform: uppercase;
+            color: #000;
+            background-color: #d1d5db; /* Light Gray header */
+            padding: 5px 0;
+            margin-bottom: 8px;
+            border: 1.5px solid #000000;
+            border-bottom: none;
+        }
+
+        /* Tables matching the excel layout */
+        .bill-split-table, .bill-tracker-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #000000;
+            margin-bottom: 8px;
+        }
+
+        .bill-split-table th, .bill-split-table td, 
+        .bill-tracker-table th, .bill-tracker-table td {
+            border: 1.5px solid #000000;
+            padding: 5px 8px;
+            vertical-align: middle;
+        }
+
+        /* Colors & Formatting */
+        .header-gray {
+            background-color: #9ca3af !important; /* Darker gray header */
+            color: #000000 !important;
+            font-weight: 700;
+            text-align: center;
+            font-size: 9.5pt;
+            text-transform: uppercase;
+        }
+
+        .header-gray-light {
+            background-color: #d1d5db !important;
+            color: #000000 !important;
+            font-weight: 700;
+            font-size: 9pt;
+        }
+
+        .label-cell {
+            background-color: #f3f4f6; /* Very light gray */
+            font-weight: 700;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            width: 22%;
+        }
+
+        .value-cell {
+            font-size: 9pt;
+            font-weight: 600;
+            width: 28%;
+        }
+
+        .highlight-gray {
+            background-color: #cbd5e1 !important; /* Middle gray */
+            font-weight: 700 !important;
+        }
+
+        .font-bold {
+            font-weight: 800 !important;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        /* Tracker Table specifics */
+        .bill-tracker-table th {
+            text-align: center;
+            font-size: 8.5pt;
+            padding: 4px;
+            color: #ffffff !important;
+        }
+
+        .bill-tracker-table td {
+            text-align: center;
+            font-size: 9pt;
+            font-weight: 600;
+            height: 22px;
+            padding: 4px;
+            color: #ffffff !important;
+        }
+
+        /* Yellow Warning/Note Banner */
+        .bill-yellow-note {
+            background-color: #fef08a !important; /* Vibrant yellow */
+            color: #000000 !important;
+            border: 1.5px solid #000000;
+            text-align: center;
+            padding: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+            font-size: 8.5pt;
+            font-weight: 700;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0mm;
+        }
+
+        @media print {
+            .print-control-banner {
+                display: none !important;
+            }
+            html, body {
+                background: #ffffff !important;
+                color: #000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+            }
+            .print-container {
+                padding: 0 !important;
+                margin: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+            .bill-page {
+                box-shadow: none !important;
+                padding: 2mm 5mm !important;
+                margin: 0 !important;
+                height: 252mm !important;
+                max-height: 252mm !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: hidden !important;
+            }
+            .bill-page:last-child {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+            .bill-slip {
+                height: 80mm !important;
+                max-height: 80mm !important;
+                border: 1.5px dashed #000000 !important;
+                padding: 1.5mm 3mm !important;
+                margin: 0 0 1mm 0 !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: hidden !important;
+            }
+            .bill-slip:last-child {
+                margin-bottom: 0 !important;
+                border-bottom: 1.5px dashed #000000 !important;
+            }
+
+            /* Extra-tight inner spacing and font sizes for absolute 3-up A4 fit */
+            .bill-main-header {
+                font-size: 11pt !important;
+                line-height: 1.0 !important;
+                margin-top: 0 !important;
+                margin-bottom: 1px !important;
+            }
+            .bill-sub-header {
+                font-size: 8pt !important;
+                padding: 0.5px 0 !important;
+                margin-bottom: 1.5px !important;
+            }
+            .bill-split-table, .bill-tracker-table {
+                margin-bottom: 1.5px !important;
+            }
+            .bill-split-table th, .bill-split-table td, 
+            .bill-tracker-table th, .bill-tracker-table td {
+                padding: 1px 3px !important;
+                border-width: 1px !important;
+            }
+            .header-gray {
+                font-size: 7pt !important;
+            }
+            .header-gray-light {
+                font-size: 6.5pt !important;
+            }
+            .label-cell {
+                font-size: 6pt !important;
+            }
+            .value-cell {
+                font-size: 6.5pt !important;
+            }
+            .bill-tracker-table th {
+                font-size: 6pt !important;
+                color: #ffffff !important;
+            }
+            .bill-tracker-table td {
+                font-size: 6.5pt !important;
+                height: 11px !important;
+                padding: 0px 2px !important;
+                color: #ffffff !important;
+            }
+            .bill-yellow-note {
+                font-size: 6pt !important;
+                padding: 1.5px !important;
+                line-height: 1.05 !important;
+            }
+            
+            /* Force exact colors & pure black text in print mode */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .bill-page, .bill-page * {
+                color: #000000 !important;
+            }
+            /* Month strip stays white text */
+            .bill-tracker-table th, .bill-tracker-table td, .bill-tracker-table .header-gray-light {
+                color: #ffffff !important;
+            }
+        }
+    </style>
+</head>
+<body style="background: #1e293b; min-height: 100vh;">
+
+    <!-- Print Control Banner (Visible on screen only) -->
+    <div class="print-control-banner">
+        <button class="btn btn-primary" onclick="window.print()">
+            🖨️ Click to Print Bills
+        </button>
+        <a href="{{ url_for('billing_details', month=cycle.billing_month) }}" class="btn btn-secondary">
+            Close Print View
+        </a>
+        <span>
+            <strong>Printing Tip:</strong> In your browser print settings, choose <strong>Portrait</strong> layout, set Margins to <strong>Default</strong> or <strong>None</strong>, and enable <strong>Background graphics</strong>.
+        </span>
+    </div>
+
+    <!-- Print Container -->
+    <div class="print-container">
+        {% for bill in bills %}
+        <div class="bill-page">
+            
+            <!-- Generate 3 Copies: Customer, Office, Bank -->
+            {% for copy_name in ['Customer Copy', 'Office Copy', 'Bank Copy'] %}
+            <div class="bill-slip">
+                {% set is_goat_farm = 'GOAT' in bill.lease.formatted_blocks.upper() or 'FARM' in bill.lease.formatted_blocks.upper() %}
+                
+                <!-- Bill Header -->
+                <div class="bill-main-header">RENTAL TRACKER</div>
+                <div class="bill-sub-header">{% if is_goat_farm %}GOAT FARM RENT BILL{% else %}SHOP RENT BILL{% endif %} ({{ copy_name }})</div>
+
+                <!-- Resident Details & Bill Summary Table -->
+                <table class="bill-split-table">
+                    <thead>
+                        <tr>
+                            <th colspan="2" class="header-gray">RESIDENT DETAILS</th>
+                            <th colspan="2" class="header-gray">MONTHLY BILL SUMMARY</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="label-cell">{% if is_goat_farm %}FARM OWNER NAME{% else %}SHOPKEEPER NAME{% endif %}</td>
+                            <td class="value-cell">{{ bill.lease.tenant_name }}</td>
+                            <td class="label-cell" {% if not is_goat_farm %}rowspan="2"{% endif %}>PREVIOUS BALANCE</td>
+                            <td class="value-cell text-right" {% if not is_goat_farm %}rowspan="2"{% endif %}>{{ format_currency(bill.prev_bal) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label-cell">{% if is_goat_farm %}Farm #{% else %}Shop #{% endif %}</td>
+                            <td class="value-cell">{% if is_goat_farm %}FARM NO#{% else %}SHOP NO#{% endif %} {{ bill.lease.formatted_shops }}</td>
+                            {% if is_goat_farm %}
+                            <td class="label-cell">RENT CHARGES</td>
+                            <td class="value-cell text-right">
+                                {% if bill.is_waived %}
+                                0.00 (Waived)
+                                {% else %}
+                                {{ format_currency(10000.00) }}
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <td class="label-cell">BLOCK</td>
+                            <td class="value-cell">{{ bill.lease.formatted_blocks }}</td>
+                            {% if is_goat_farm %}
+                            <td class="label-cell">FRESH WATER & ELECTRIC CHARGES</td>
+                            <td class="value-cell text-right">
+                                {% if bill.is_waived %}
+                                0.00
+                                {% else %}
+                                {{ format_currency(2000.00) }}
+                                {% endif %}
+                            </td>
+                            {% else %}
+                            <td class="label-cell" rowspan="2">RENT CHARGES</td>
+                            <td class="value-cell text-right" rowspan="2">
+                                {% if bill.is_waived %}
+                                0.00 (Waived)
+                                {% else %}
+                                {{ format_currency(bill.rent) }}
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <td class="label-cell">BILLING MONTH</td>
+                            <td class="value-cell font-bold" style="color: #000000;">{{ bill.billing_month_formatted }}</td>
+                            {% if is_goat_farm %}
+                            <td class="label-cell highlight-gray">PAYABLE WITHIN DUE DATE</td>
+                            <td class="value-cell text-right highlight-gray font-bold">PKR {{ format_currency(bill.payable_within) }}</td>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <td class="label-cell">ISSUE DATE</td>
+                            <td class="value-cell">{{ bill.issue_date_formatted }}</td>
+                            {% if is_goat_farm %}
+                            <td class="label-cell">L.P. Surcharge</td>
+                            <td class="value-cell text-right">PKR {{ format_currency(bill.surcharge) }}</td>
+                            {% else %}
+                            <td class="label-cell highlight-gray">PAYABLE WITHIN DUE DATE</td>
+                            <td class="value-cell text-right highlight-gray font-bold">PKR {{ format_currency(bill.payable_within) }}</td>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <td class="label-cell">DUE DATE</td>
+                            <td class="value-cell font-bold" style="color: #000000;">{{ bill.due_date_formatted }}</td>
+                            <td class="label-cell highlight-gray">PAYABLE AFTER DUE DATE</td>
+                            <td class="value-cell text-right highlight-gray font-bold">PKR {{ format_currency(bill.payable_after) }}</td>
+                        </tr>
+                        {% if not is_goat_farm %}
+                        <tr>
+                            <td class="label-cell">L.P. Surcharge</td>
+                            <td class="value-cell text-right">PKR {{ format_currency(bill.surcharge) }}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+
+                </table>
+
+                <!-- Monthly Tracker Table -->
+                <table class="bill-tracker-table">
+                    <thead>
+                        <tr class="header-gray-light">
+                            <th style="width: 12%; text-align: left;">MONTH</th>
+                            {% for t in bill.tracker %}
+                            <th>{{ t.label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="font-bold header-gray-light" style="text-align: left;">PAYABLE</td>
+                            {% for t in bill.tracker %}
+                            <td>
+                                {% if t.amount is not none %}
+                                    {{ format_currency(t.amount) }}
+                                {% else %}
+                                    &nbsp;
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Bottom yellow banner note -->
+                <div class="bill-yellow-note">
+                    NOTE: If bill is not delivered till 07 of each month, please Contact Manager Admin Whatsapp # 0334-3265419
+                </div>
+
+            </div>
+            {% endfor %}
+
+        </div>
+        {% endfor %}
+    </div>
+
+</body>
+</html>

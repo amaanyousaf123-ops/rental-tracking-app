@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Plan #{{ plan.id }} — {{ plan.lease.tenant_name }} — Rental Tracker Billing{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Installment Plan #{{ plan.id }}</h1>
+    <a href="{{ url_for('installments_list') }}" class="btn btn-secondary">← Back to Plans</a>
+</div>
+
+<!-- Plan Summary Card -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="grid-2col" style="gap: 1.5rem;">
+        <div>
+            <h2 class="card-title" style="margin-bottom: 1rem;">Plan Details</h2>
+            <table style="width: 100%;">
+                <tr>
+                    <td style="padding: 0.4rem 0; color: var(--text-secondary);">Tenant</td>
+                    <td style="padding: 0.4rem 0;">
+                        <a href="{{ url_for('tenant_statement', lease_id=plan.lease.id) }}" class="tenant-link">
+                            {{ plan.lease.tenant_name }}
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.4rem 0; color: var(--text-secondary);">Shop(s)</td>
+                    <td style="padding: 0.4rem 0;">{{ plan.lease.formatted_blocks }} — {{ plan.lease.formatted_shops }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.4rem 0; color: var(--text-secondary);">Total Amount</td>
+                    <td style="padding: 0.4rem 0; color: var(--danger); font-weight: 600;">PKR {{ format_currency(plan.total_amount) }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.4rem 0; color: var(--text-secondary);">Per Installment</td>
+                    <td style="padding: 0.4rem 0; font-weight: 600;">PKR {{ format_currency(plan.installment_amount) }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.4rem 0; color: var(--text-secondary);">Start Date</td>
+                    <td style="padding: 0.4rem 0;">{{ plan.start_date }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.4rem 0; color: var(--text-secondary);">Created By</td>
+                    <td style="padding: 0.4rem 0;">{{ plan.created_by }} on {{ plan.created_at.strftime('%d %b %Y') }}</td>
+                </tr>
+                {% if plan.notes %}
+                <tr>
+                    <td style="padding: 0.4rem 0; color: var(--text-secondary);">Notes</td>
+                    <td style="padding: 0.4rem 0;">{{ plan.notes }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <!-- Status & Progress -->
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                {% if plan.status == 'Active' %}
+                    <span class="badge badge-active" style="font-size: 1rem; padding: 0.5rem 1.2rem;">Active</span>
+                {% elif plan.status == 'Completed' %}
+                    <span class="badge badge-success" style="font-size: 1rem; padding: 0.5rem 1.2rem;">✓ Completed</span>
+                {% else %}
+                    <span class="badge badge-inactive" style="font-size: 1rem; padding: 0.5rem 1.2rem;">Cancelled</span>
+                {% endif %}
+            </div>
+
+            <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary);">
+                {{ plan.paid_count }}/{{ plan.num_installments }}
+            </div>
+            <div style="color: var(--text-secondary); margin-bottom: 1rem;">Installments Paid</div>
+
+            <div class="progress-bar-container" style="width: 100%; max-width: 250px;">
+                <div class="progress-bar-fill" style="width: {{ plan.progress_pct }}%"></div>
+                <span class="progress-bar-label">{{ plan.progress_pct }}%</span>
+            </div>
+
+            <div style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-secondary);">
+                Paid: <strong style="color: var(--success);">PKR {{ format_currency(plan.total_paid) }}</strong>
+                &nbsp;/&nbsp;
+                Total: <strong>PKR {{ format_currency(plan.total_amount) }}</strong>
+            </div>
+
+            {% if plan.status == 'Active' %}
+            <form action="{{ url_for('installment_cancel', plan_id=plan.id) }}" method="POST"
+                  class="confirm-delete" data-name="this installment plan" style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-danger btn-sm">Cancel Plan</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Installments Table -->
+<div class="card">
+    <h2 class="card-title" style="margin-bottom: 1rem;">Installment Schedule</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Due Date</th>
+                    <th>Amount Due</th>
+                    <th>Amount Paid</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
+                    <th>Paid Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inst in plan.installments %}
+                <tr>
+                    <td>{{ inst.installment_number }}</td>
+                    <td>{{ inst.due_date }}</td>
+                    <td>PKR {{ format_currency(inst.amount_due) }}</td>
+                    <td>
+                        {% if inst.amount_paid > 0 %}
+                            <span style="color: var(--success);">PKR {{ format_currency(inst.amount_paid) }}</span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if inst.remaining > 0 %}
+                            <span style="color: var(--danger);">PKR {{ format_currency(inst.remaining) }}</span>
+                        {% else %}
+                            <span style="color: var(--success);">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if inst.status == 'Paid' %}
+                            <span class="badge badge-success">Paid</span>
+                        {% elif inst.status == 'Partially Paid' %}
+                            <span class="badge badge-warning">Partial</span>
+                        {% elif inst.status == 'Overdue' %}
+                            <span class="badge badge-danger">Overdue</span>
+                        {% else %}
+                            <span class="badge badge-pending">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ inst.paid_date or '—' }}</td>
+                    <td>
+                        {% if plan.status == 'Active' and inst.status in ['Pending', 'Overdue', 'Partially Paid'] and inst == plan.next_unpaid %}
+                            <form action="{{ url_for('installment_pay', plan_id=plan.id) }}" method="POST" style="display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <input type="hidden" name="installment_id" value="{{ inst.id }}">
+                                <input type="hidden" name="operator_name" value="{{ plan.created_by }}">
+                                <div style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">PKR</span>
+                                    <input type="number" name="amount" step="0.01" min="0.01" max="{{ inst.remaining }}" value="{{ inst.remaining }}" class="form-control" style="width: 110px; padding: 0.35rem 0.5rem; font-size: 0.9rem; border-radius: 6px; text-align: right;" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm" style="padding: 0.35rem 0.75rem;">Pay</button>
+                            </form>
+                        {% elif inst.status == 'Paid' %}
+                            <span style="color: var(--success);">✓</span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Rental Tracking App{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="navbar">
+            <a href="{{ url_for('dashboard') }}" class="nav-brand">
+                <span>Rental Tracker</span> Billing
+            </a>
+            <ul class="nav-links">
+                <li>
+                    <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                        Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('tenants') }}" class="nav-link {% if request.endpoint in ['tenants', 'edit_tenant', 'override_balance'] %}active{% endif %}">
+                        Tenants
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('payment') }}" class="nav-link {% if request.endpoint == 'payment' %}active{% endif %}">
+                        Log Payment
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('installments_list') }}" class="nav-link {% if request.endpoint in ['installments_list', 'installment_create', 'installment_detail'] %}active{% endif %}">
+                        Installments
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('shops_setup') }}" class="nav-link {% if request.endpoint == 'shops_setup' %}active{% endif %}">
+                        Shops Setup
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('billing') }}" class="nav-link {% if request.endpoint in ['billing', 'billing_details', 'print_bills'] %}active{% endif %}">
+                        Billing
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('audit_logs') }}" class="nav-link {% if request.endpoint == 'audit_logs' %}active{% endif %}">
+                        Audit Trail
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <!-- Flash Message Container -->
+        <div class="flash-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            <span>{{ message }}</span>
+                            <button class="close-btn">&times;</button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div>&copy; {{ current_time.year }} Rental Tracking App. All Rights Reserved.</div>
+        <div class="lan-banner">
+            Local Network Host URL: <strong>http://{{ lan_ip }}:5000</strong>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
